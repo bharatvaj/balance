@@ -1,0 +1,7 @@
+2015/10/12 Exxon
+    Expenses:Auto:Gas
+    Liabilities:MasterCard   $-10.00
+
+2015/10/12 Exide
+    Expenses:Auto:Gas
+    Assets:Credit  $-5.00
