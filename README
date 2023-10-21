@@ -1,0 +1,15 @@
+balance
+=======
+
+balance is a cross-platform frontend to ledger(pta) with emphasis on simplicity. It is written in c99 and works on top of nuklear making it lightweigt and fast.
+
+NOTE: The quality of the software is beta in the least, it's still in development.
+
+It is configu
+
+Build
+-----
+
+	make
+
+will generate the 'hot' which you can use to 
