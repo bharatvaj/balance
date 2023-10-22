@@ -2,7 +2,7 @@ GENERAL_FLAGS=-fPIC
 LDFLAGS=$(GENERAL_FLAGS) -lglfw -lGL -lm
 CFLAGS=$(GENERAL_FLAGS) -O0 -I. -g -Werror #-Wpedantic
 
-.DEFAULT_GOAL=hot
+.DEFAULT_GOAL=hotbook
 
 CC=tcc
 
@@ -19,11 +19,13 @@ balance: balance.c ledger.h
 
 hot: hot.c libbalance.so
 
+hotbook: hotbook.c libbook.so
+
 refresh:
-	git ls-files | entr make libbalance.so
+	git ls-files | entr make libbook.so
 
 autorefresh:
-	ls libbalance.so | entr kill -3 $$(pgrep hot)
+	ls libbook.so | entr kill -3 $$(pgrep hot)
 
 clean:
 	-rm $$(cat .gitignore)

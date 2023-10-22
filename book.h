@@ -26,7 +26,7 @@ Entry** ledger_read_file(const char* filename, time_t date_start, time_t date_en
 		entry->from = &me;
 		entry->to = (Entity*)malloc(sizeof(Entity));
 		entry->to->name = (char*)malloc(sizeof(char*) * 20);
-		strcpy(entry->to->name, "Woman");
+		strcpy(entry->to->name, "Man");
 	}
 	return new_list;
 }
