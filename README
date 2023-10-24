@@ -1,15 +1,20 @@
-balance
-=======
+peredu
+======
+பேரேடு
+======
 
-balance is a cross-platform frontend to ledger(pta) with emphasis on simplicity. It is written in c99 and works on top of nuklear making it lightweigt and fast.
+peredu is a cross-platform frontend to ledger(pta) with emphasis on simplicity. perudu means ledger in Tamil. It is written in c99 and works on top of nuklear making it lightweigt and fast.
 
 NOTE: The quality of the software is beta in the least, it's still in development.
 
-It is configu
+For now the following commands work,
+
+	ledger balance -f file.txt [-b  2023/01/01] [-e 2023/01/31] -S [date|amount] [register query ...]
+
 
 Build
 -----
 
 	make
 
-will generate the 'hot' which you can use to 
+will generate 'hotbook' which you can use to start the motor

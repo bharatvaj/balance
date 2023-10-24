@@ -19,13 +19,12 @@ balance: balance.c ledger.h
 
 hot: hot.c libbalance.so
 
+libbook.so: book.c book.h
+
 hotbook: hotbook.c libbook.so
 
 refresh:
-	git ls-files | entr make libbook.so
-
-autorefresh:
-	ls libbook.so | entr kill -3 $$(pgrep hot)
+	git ls-files | entr sh hot.sh
 
 clean:
 	-rm $$(cat .gitignore)
