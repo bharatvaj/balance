@@ -2,6 +2,23 @@
     Expenses:Auto:Gas
     Liabilities:MasterCard   $-10.00
 
-2015/10/12 Exide
-    Expenses:Auto:Gas
-    Assets:Credit  $-5.00
+2015/10/12 Donna's Cake World
+    Expenses:Food:Dessert
+    Liabilities:Credit	-$5.00
+
+2024/10/25 Zaitoon
+    Expenses:Food:Dinner
+    Liabilities:Credit	-$5
+
+2025/10/20 Old loan from friend
+    Assets:Cash
+    Friend:Cash	-$200
+
+2024/10/24 Donna's Cake World
+    Expenses:Food:Dessert	$5
+    Expenses:Food:Dinner	$19
+    Assets:Cash	-$24
+
+2015/10/12 Zoho
+	Income:Salary
+	Assets:Bank:Checking	$10,000

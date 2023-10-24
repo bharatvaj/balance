@@ -1,0 +1,34 @@
+registers (tree)
+Expenses:
+	----
+	|- Food:
+		----
+		|- Dessert(+5)
+		|- Dinner(
+	|- Auto:
+		----
+		|- Gas
+		|- Gas:
+			---
+
+ record_tags = {
+	"Food:Dessert"
+}
+balance
+-------
+
+
+ somehow map the get_entries pipe to entry and do the foreach loop, so the loop will work async
+ balance = 0
+ balance_struct (tree) ;
+ for(entry in parse_entries(FILE* f, from = unix_epoch | -e, to = now)) {
+	date = entry->date // useful for sorting?
+	for (record in parse_records(entry)) {
+		int get_rec_ptr = record->nn_name; // to get the string name and to verify with other records
+		int get_val = record->amount;
+		balance_struct.add(get_rec_ptr, get_val); // add value 'get_val' to 'get_rec_ptr'
+		balance += get_val;
+	}
+ printf("-----------------\n");
+ printf("%s %d", denom, balance);
+}
