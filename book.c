@@ -183,7 +183,7 @@ int account_add(map_tree_t **rootp, char *acc, size_t acc_size)
 				printf("Present already= %d %.*s\n", j, j, acc);
 			}
 			if (i + 1 != acc_size) {
-				return account_add(&(*rootp)->children, acc + j,
+				return account_add(&(current_node->children), acc + j,
 						acc_size - j);
 			}
 		}
@@ -245,8 +245,7 @@ void ledger_parse_data(char *text, size_t text_len)
 				switch (state) {
 					case ENTRY_WHO:
 					case ENTRY_END:
-						// push the entries to stack or somethin
-						printf("case ENTRY_END: '%c', prev: '%c'\n", c, text[i-1]);
+						// TODO push the entries to stack or somethin
 						if (text[i - 1] == '\n') {
 							printf("----- Entry End Marked -----\n");
 							state = DATE;
