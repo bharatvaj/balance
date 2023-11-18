@@ -1,5 +1,6 @@
 balance
 hot
+hotbook
 *.so
 *.o
 tags

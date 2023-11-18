@@ -38,8 +38,8 @@ void* module_main(struct nk_context* ctx, int width, int height) {
 		float size[] = {0.10, 0.70, 0.30};
 		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, size);
 		nk_layout_row_begin(ctx, NK_STATIC, 25, 1);
-		nk_layout_row_push(ctx, 40);
-		nk_label(ctx, "500", NK_TEXT_LEFT);
+		//nk_layout_row_push(ctx, 40);
+		//nk_label(ctx, "500", NK_TEXT_LEFT);
 		nk_layout_row_end(ctx);
 
 		int len = 12;
@@ -52,8 +52,8 @@ void* module_main(struct nk_context* ctx, int width, int height) {
 				printf("%s\n", name);
 				edit_entry(i);
 			}
-			nk_layout_row_push(ctx, 0.3f);
-			nk_label(ctx, "500", NK_TEXT_LEFT);
+			//nk_layout_row_push(ctx, 0.3f);
+			//nk_label(ctx, "500", NK_TEXT_LEFT);
 			nk_layout_row_end(ctx);
 		}
 

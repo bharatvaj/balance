@@ -56,7 +56,8 @@ int main(int argc, char* argv[]) {
 	ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
 	/***********************/
 	//nk_init_fixed(ctx, calloc(1, MAX_MEMORY), MAX_MEMORY, &font);
-	{struct nk_font_atlas *atlas;
+	{
+		struct nk_font_atlas *atlas;
 		nk_glfw3_font_stash_begin(&atlas);
 		struct nk_font *droid = nk_font_atlas_add_from_file(atlas, "./Ubuntu-Medium.ttf", 14, 0);
 		nk_glfw3_font_stash_end();
@@ -64,7 +65,7 @@ int main(int argc, char* argv[]) {
 	}
 	while(1) {
 		void* module = dlopen("./libbalance.so", RTLD_NOW);
-		while(module == NULL){
+		while(module == NULL) {
 			fprintf(stderr, "Failed to load module. (%s)\n", dlerror());
 			fprintf(stderr, "Press return to try again.\n");
 			getchar();

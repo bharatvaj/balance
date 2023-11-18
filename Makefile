@@ -26,5 +26,9 @@ hotbook: hotbook.c libbook.so
 refresh:
 	git ls-files | entr sh hot.sh
 
+format:
+	indent -psl -pal --use-tabs -ts4 -br -brs -ce -cli0 book.c
+
 clean:
-	-rm $$(cat .gitignore)
+	-rm *.so *.o hotbook libbook.so
+
