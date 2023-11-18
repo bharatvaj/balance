@@ -1,9 +1,9 @@
-peredu
-======
+payeredo
+========
 பேரேடு
 ======
 
-peredu is a cross-platform frontend to ledger(pta) with emphasis on simplicity. perudu means ledger in Tamil. It is written in c99 and works on top of nuklear making it lightweight and fast.
+payeredo is a cross-platform frontend to ledger(pta) with emphasis on simplicity. perudu means ledger in Tamil. It is written in c99 and works on top of nuklear making it lightweight and fast.
 
 NOTE: The quality of the software is beta in the least, it's still in development.
 
