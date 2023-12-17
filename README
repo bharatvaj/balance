@@ -9,8 +9,31 @@ NOTE: The quality of the software is beta in the least, it's still in developmen
 
 For now the following commands work,
 
-	ledger balance -f file.txt [-b  2023/01/01] [-e 2023/01/31] -S [date|amount] [register query ...]
+	$ ./hotbook
 
+Why payeredo when ledger-cli exists?
+------------------------------------
+
+ledger-cli itself pretty lightweight but it has a handful of dependencies and features which I don't particularly use.
+
+payeredo follows a very suckless approach to ledger and does NOT provide some of the advanced features ledger provides.
+
+It should be noted that payeredo is usually faster than ledger-cli, it does not provide some of the niceties that ledger-cil provides.
+
+Goals
+-----
+- Compact as possible
+- Limited regex, ^,$ and *
+- BSD style arguments
+- Native Windows support
+- csv, emacs export/import
+
+Non-Goals
+---------
+- Python support
+- Elaborate regex
+- limited REPL
+- XML support
 
 Build
 -----

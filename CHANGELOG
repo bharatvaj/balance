@@ -1,0 +1,5 @@
+Dark Ages
+---------
+- Starting keeping CHANGELOG file for payredo
+- Basic combined parser/lexer for the ledger format has been
+implemented in book.c

@@ -1,0 +1,64 @@
+HACKING
+=======
+
+yyyy/mm/dd <till \n>
+  <till double space>  <sign|commodity|quantity>\n
+  ...\n
+  ...\n\n // mark posting on \n\n
+
+
+payredo can be bulit as a standalone library(libpayredo) or can be built as an executable.
+
+	make libpayredo.a
+	make libpayredo.so
+	make payredo
+
+You can control what you want to build by invoking it separately. By default builds everything.
+
+commit.c
+------
+The original ledger-cli does not do edits, to make the runtime simple but since the database is completely ASCII and unorganized, consequent and programmatic writes creates a stress on the CPU and RAM, making it unsuitable for building touch friendly GUIs or general clients on top of it without comprosing UX.
+
+To prevent this, payredo exposes a commit API which can be used by text editors and other frontends to validate added content before saving it to the file.
+
+Once you are done with the changes in the text editor or other GUI, you can commit the data to payredo using the APIs
+
+	int ledger_commit_text(new_text, new_text_len)
+	int ledger_commit_post(timestamp, comment, comment_len, entries**)
+
+The first variant can be used by text editors where the structure of the parsed text is not understood.
+
+The second variant can be used when frontend is a GUI or other UI where the user input is controlled.
+
+RETURN VALUE
+------------
+Both variants return PARSE_OK if suceeded, and -1 on failure.
+
+
+payredo.c
+---------
+Similar to ledger-cli
+payredo follows the UNIX style option arguments to make the parsing easy and to combine multiple options
+
+
+parse.c
+-------
+There are two parsers written for the
+* main ledger file
+* price history file
+
+
+The parser is written entirely by hand to reduce dependencies.
+
+The `state` variable at any given time holds the information 'what we are trying to parse'. If the `state` has the value `DATE`, it means we are in a condition where we expect DATE to occur such as when starting the parser or when a posting is parsed.
+
+There aren't as many states as the ledger format itself is quite minimal.  These are currently the states,
+
+DATE
+COMMENT
+ENTRY_WHO
+ENTRY_AMOUNT
+ENTRY_END
+
+
+

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <ctype.h>
+#include <limits.h>
 #include "common.h"
 #include "strn.h"
 
@@ -25,28 +26,17 @@
 #define _XOPEN_SOURCE
 #include <time.h>
 
+#include "vstr.h"
+#include "account.h"
 #include "book.h"
 
-#define warning(STR,...) \
+#define BUFFER_SIZE 256
+
+#define warning(STR) \
+	fprintf(stdout, "\033[31m"STR"\033[0m");
+
+#define warningf(STR,...) \
 	fprintf(stdout, "\033[31m"STR"\033[0m", __VA_ARGS__);
-
-typedef struct {
-	char *str;
-	size_t len;
-} vstr_t;
-
-size_t tree_depth = 4;
-
-struct map_tree;
-
-struct map_tree {
-	vstr_t *value;
-	size_t children_cap;
-	size_t children_len;
-	struct map_tree *children;
-};
-
-typedef struct map_tree map_tree_t;
 
 vstr_t tags[100] = { 0 };
 
@@ -74,9 +64,15 @@ char commodity_list[256][8];
 
 map_tree_t *rootp = NULL;
 
+
+// store numbers in the least denom
+// 1.50$ == 150
+// 2$ == 200
+// 2.23$ == 200
+
 typedef struct {
 	vstr_t *denom;
-	int amount;
+	size_t amount;
 } LedgerValue;
 
 typedef struct {
@@ -110,8 +106,12 @@ const char *states_str[] = {
 	"ENTRY START",
 	"ENTRY SPACE",
 	"ENTRY WHO",
-	"ENTRY DENOM",
+	"ENTRY SIGN",
+	"ENTRY SIGN OR AMOUNT",
 	"ENTRY AMOUNT",
+	"ENTRY DENOM",
+	"ENTRY DENOM OR AMOUNT",
+	"ENTRY SIGN OR DENOM OR AMOUNT",
 	"ENTRY END",
 };
 
@@ -121,99 +121,16 @@ typedef enum {
 	ENTRY_START, // entry starts after a comment
 	ENTRY_SPACE,
 	ENTRY_WHO,
-	ENTRY_DENOM,
+	ENTRY_SIGN,
+	ENTRY_SIGN_AMOUNT,
 	ENTRY_AMOUNT,
+	ENTRY_DENOM ,
+	ENTRY_DENOM_AMOUNT,
+	ENTRY_SIGN_DENOM_AMOUNT,
 	ENTRY_END, // finish up entry if encountering any \n\n or \n text_len == i or text_len == i, otherwise set state to ENTRY_SPACE
+	POSTING_END,
 } LedgerParseStates;
 
-map_tree_t *account_search(map_tree_t *children, char *acc, size_t acc_size)
-{
-	if (children->children == NULL)
-		return children;
-	vstr_t *rk = children->value;
-	if (rk != NULL && acc_size == rk->len
-			&& (strncmp(acc, rk->str, acc_size) == 0)) {
-		return children;
-	}
-	for (size_t i = 0; i < children->children_len; i++) {
-		vstr_t *val = children->children[i].value;
-		if (val != NULL && acc_size == val->len
-				&& (strncmp(acc, val->str, acc_size) == 0)) {
-			return children->children + i;
-		}
-	}
-	// when the search is exhausted and nothing is found,
-	// return the previously allocated child
-	// TODO if len < cap allocate memory
-	map_tree_t *child_to_return =
-		children->children + children->children_len;
-	children->children_len++;
-	return child_to_return;
-}
-
-int account_add(map_tree_t **rootp, char *acc, size_t acc_size)
-{
-	size_t records_needed = tree_depth * 4;
-	if (*rootp == NULL) {
-		*rootp = malloc(sizeof(map_tree_t));
-	}
-	if ((*rootp)->children == NULL) {
-		(*rootp)->children =
-			(map_tree_t *) calloc(records_needed, sizeof(map_tree_t));
-		(*rootp)->children_cap = records_needed;
-	}
-	size_t i = 0;
-	while (i < acc_size) {
-		if (acc[i] == ':' || i + 1 == acc_size) {
-			size_t j = i + 1;
-			map_tree_t *current_node =
-				account_search(*rootp, acc, j);
-			assert(current_node != NULL);
-			if (current_node->value == NULL) {
-				// current_node->value is NULL when the search fails
-				// we have to set the value now
-				// TODO maybe save vstrs in a pool and use them
-				vstr_t *vstr =
-					(vstr_t *) malloc(sizeof(vstr_t));
-				vstr->str = acc;
-				vstr->len = j;
-				current_node->value = vstr;
-				printf("%d %.*s\n", j, j, acc);
-			} else {
-				printf("Present already= %d %.*s\n", j, j, acc);
-			}
-			if (i + 1 != acc_size) {
-				return account_add(&(current_node->children), acc + j,
-						acc_size - j);
-			}
-		}
-		i++;
-	}
-	return -1;
-}
-
-size_t tab_acc = 0;
-
-void walk_it (map_tree_t* rootp)
-{
-	if (rootp == NULL)
-		return;
-	vstr_t *val = rootp->value;
-	if (val != NULL) {
-		for (size_t i = 0; i < tab_acc; i++) {
-			printf("\t");
-		}
-		printf("-|%.*s|-\n", val->len, val->str);
-	}
-	tab_acc++;
-	if (rootp->children == NULL)
-		return;
-	for (int i = 0; i < rootp->children_len; i++) {
-		printf("|", i);
-		walk_it(rootp->children + i);
-	}
-	tab_acc--;
-}
 
 void ledger_parse_data(char *text, size_t text_len)
 {
@@ -229,13 +146,14 @@ void ledger_parse_data(char *text, size_t text_len)
 	time_t hold_date;
 	vstr_t hold_comment = { 0 };
 	vstr_t hold_register = { 0 };
+	long int hold_amount = LONG_MAX;
+	short hold_sign = -1;
 	size_t hold_denom_id = { 0 };
 	short n_count = 0;
 
 	while (i < text_len) {
 		char c = text[i];
 		// we use \n to identify entry done in ledger
-		//
 		switch (c) {
 			case '\n':
 			case '\r':
@@ -243,21 +161,28 @@ void ledger_parse_data(char *text, size_t text_len)
 				n_count++;
 				printf("\n%d| ", line_no);
 				switch (state) {
+					// after parsing the amount seq, we set the state to ENTRY_WHO
 					case ENTRY_WHO:
 					case ENTRY_END:
-						// TODO push the entries to stack or somethin
+						warning("----- Entry End Marked -----\n");
+						hold_sign = -1;
+						hold_amount = LONG_MAX;
+						// if entry_count <= 1 throw error
 						if (text[i - 1] == '\n') {
-							printf("----- Entry End Marked -----\n");
 							state = DATE;
+							// TODO push the entries to stack or somethin
+							warning("----- Posting End Marked -----\n");
+							// state = POSTING_END;
 						} else {
 							state = ENTRY_WHO;
 						}
 						break;
 					case COMMENT:
+					case ENTRY_SIGN_DENOM_AMOUNT:
 						state = ENTRY_WHO;
 						break;
 					case ENTRY_DENOM:
-						warning("%s\n", "denom not found, setting state WHO");
+						warningf("%s\n", "denom not found, setting state WHO");
 						state = ENTRY_WHO;
 						break;
 					case ENTRY_AMOUNT:
@@ -280,8 +205,8 @@ void ledger_parse_data(char *text, size_t text_len)
 				if (isdigit(c)) {
 					// try to parse a date
 					time_t tn = ledger_timestamp_from_ledger_date(text + i);
-					warning("date str: %.*s\n", 10, text + i);
-					warning("date: %ld\n", tn);
+					warningf("date str: %.*s\n", 10, text + i);
+					warningf("date: %ld\n", tn);
 					// date is expected to have the form DD/MM/YYYY (10)
 					i += 10;
 					if (tn == (time_t) - 1) goto ledger_parse_error_handle;
@@ -301,7 +226,7 @@ void ledger_parse_data(char *text, size_t text_len)
 						comment_len++;
 					}
 					comment.len = comment_len;
-					warning("Comment: %.*s\n", comment_len,
+					warningf("Comment: %.*s\n", comment_len,
 							comment);
 					state = ENTRY_WHO;
 				}
@@ -311,7 +236,7 @@ void ledger_parse_data(char *text, size_t text_len)
 					size_t original_i = i;
 					while (i < text_len && isspace(text[i])) i++;
 					int wsc = i - original_i;
-					warning("i: %ld, Spaces: %d\n", i, wsc);
+					warningf("i: %ld, Spaces: %d\n", i, wsc);
 					if (wsc < 2) {
 						goto ledger_parse_error_handle;
 					}
@@ -343,56 +268,96 @@ void ledger_parse_data(char *text, size_t text_len)
 					}
 ledger_who_parsed:
 					who_len = i - who_len;
-					printf("parsed: i=%d\n", i);
+					warningf("parsed: i=%d\n", i);
 					account_add(&rootp, who.str, who_len);
-					warning("i=%d, Who: %.*s\n", i, who_len, who);
-					state = ENTRY_DENOM;
+					warningf("i=%d, Who: %.*s\n", i, who_len, who);
+					state = ENTRY_SIGN_DENOM_AMOUNT;
 					// add to tags here
 				}
 				break;
-			case ENTRY_DENOM:
-				{
-					warning("denom-i: %d\n", i + 1);
-					size_t denom_len = i;
-					vstr_t denom = {
-						.str = text + i,
-						.len = 0
-					};
-					while (i < text_len && !isdigit(*(text + i)))
-						i++;
-					state = ENTRY_AMOUNT;
-					denom_len = i - denom_len;
-					denom.len = denom_len;
-					warning("len: %d, denom: %.*s, i: %d\n", denom_len, denom_len, denom.str, i);
+			case ENTRY_SIGN_DENOM_AMOUNT:
+				if (*(text + i) == '-' ) {
+					// TODO throw already set error
+					if (hold_sign >= 0) goto ledger_parse_error_handle;
+					state = ENTRY_SIGN;
+				} else if (isdigit(*(text + i))) state = ENTRY_AMOUNT;
+				else state = ENTRY_DENOM;
+				continue;
+			case ENTRY_SIGN_AMOUNT:
+				if (*(text + i) == '-' ) {
+					// TODO throw already set error
+					if (hold_sign >= 0) goto ledger_parse_error_handle;
+					state = ENTRY_SIGN;
+				} else if (isdigit(*(text + i))) state = ENTRY_AMOUNT;
+				else goto ledger_parse_error_handle;
+				break;
+			case ENTRY_SIGN: {
+				if (*(text + i) == '-') {
+					   i++;
+					   // AMOUNT cannot be set before SIGN
+					   if (hold_amount != LONG_MAX) goto ledger_parse_error_handle;
+					   hold_sign = 1;
+					   state = ENTRY_SIGN_DENOM_AMOUNT;
+				}
+			 } break;
+			case ENTRY_DENOM: {
+				char _c;
+				warningf("denom-i: %d\n", i + 1);
+				char *denom = text + i;
+				size_t denom_len = 0;
+				while (i < text_len &&
+						( isalpha(*(text + i))
+						 || *(text + i) == '$')) i++;
+				denom_len = (text + i) - denom;
+				if (hold_amount == LONG_MAX)
+					state = hold_sign? ENTRY_AMOUNT: ENTRY_SIGN_AMOUNT;
+				else
+					state = ENTRY_END;
+				warningf("%d> len: %d, denom: %.*s\n", i, denom_len, denom_len, denom);
+				break;
+			}
+			case ENTRY_AMOUNT: {
+				char _c;
+				warningf("amount-i: %d\n", i + 1);
+				char *amount = text + i;
+				size_t amount_len = 0;
+				while (i < text_len  &&  (_c = *(text + i)) == '.' || isdigit(_c) || _c == ',') i++;
+				amount_len = (text + i) - amount;
+				// TODO convert amount to hold_amount integer
+				hold_amount = 0;
+				state = hold_denom_id == 0? ENTRY_DENOM : ENTRY_END;
+				warningf("%d> len: %d, amount: %.*s\n", i, amount_len, amount_len, amount);
 				}
 				break;
-			case ENTRY_AMOUNT:
-				{
-					warning("amount-i: %d\n", i + 1);
-					char *amount = text + i;
-					size_t amount_len = i;
-					char _c = *(text + i);
-					while (i < text_len && (isdigit(_c) || _c == '.' || _c == ',')) {
-						i++;
-						_c = *(text + i);
-					}
-					state = ENTRY_END;
-					amount_len = i - amount_len;
-					warning("%d> len: %d, amount: %.*s\n", i, amount_len, amount_len, amount);
-				}
+			default:
+				goto ledger_parse_error_handle;
 		}
 	}
-	printf("read complete\n");
+	warning("read complete\n");
 	return;
 ledger_parse_error_handle:
-	warning("Parse failed at line %ld(%d)\n, Expected %s, got '%c'",
+	warningf("Parse failed at %ld b:(%d), Expected %s, got '%c'",
 			line_no, i, states_str[state], text[i]);
+}
+
+int main(int argc, char* argv[]) {
+	FILE* in = fopen("october-2023.txt", "r");
+	char* data = (char*)malloc(2048 * sizeof(char));
+	size_t data_size = 0;
+	size_t c_read =  0;
+	while((c_read = fread(data + data_size + 0, 1, BUFFER_SIZE, in)) != 0) {
+		data_size += c_read;
+	}
+	if (ferror(in)) fprintf(stderr, "Error reading file\n");
+	fprintf(stdout, "Startig loop\n");
+	ledger_parse_data(data, data_size);
+	return 0;
 }
 
 void *module_main(char *data, size_t data_len)
 {
 	// printf("%s\n", data);
-	printf("\n=======| Startality |=======\n");
+	warning("\n=======| Startality |=======\n");
 	ledger_parse_data(data, data_len);
-	printf("\n========| Fatality |========\n");
+	warning("\n========| Fatality |========\n");
 }

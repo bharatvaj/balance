@@ -1,7 +1,7 @@
 #ifndef _STRN_H
 #define _STRN_H
 
-inline int natoi(char* str, size_t len) {
+int natoi(char* str, size_t len) {
 	int final = 0;
 	int i = 0;
 	// ignore leading zeroes
@@ -12,5 +12,6 @@ inline int natoi(char* str, size_t len) {
 	}
 	return final;
 }
+
 
 #endif
