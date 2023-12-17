@@ -4,3 +4,8 @@ hotbook
 *.so
 *.o
 tags
+
+tests/*
+!tests/tests.mk
+!tests/account_tree.c
+!tests/csv_export.c

@@ -27,8 +27,8 @@
 #include <time.h>
 
 #include "vstr.h"
-#include "account.h"
-#include "book.h"
+#include <account.h>
+#include <book.h>
 
 #define BUFFER_SIZE 256
 
@@ -159,30 +159,31 @@ void ledger_parse_data(char *text, size_t text_len)
 			case '\r':
 				line_no++;
 				n_count++;
-				printf("\n%d| ", line_no);
 				switch (state) {
 					// after parsing the amount seq, we set the state to ENTRY_WHO
 					case ENTRY_WHO:
 					case ENTRY_END:
-						warning("----- Entry End Marked -----\n");
 						hold_sign = -1;
 						hold_amount = LONG_MAX;
 						// if entry_count <= 1 throw error
 						if (text[i - 1] == '\n') {
 							state = DATE;
 							// TODO push the entries to stack or somethin
-							warning("----- Posting End Marked -----\n");
+							warning("\n==\n");
 							// state = POSTING_END;
 						} else {
 							state = ENTRY_WHO;
+							warning(",");
 						}
 						break;
 					case COMMENT:
+						state = ENTRY_START;
+						break;
 					case ENTRY_SIGN_DENOM_AMOUNT:
 						state = ENTRY_WHO;
 						break;
 					case ENTRY_DENOM:
-						warningf("%s\n", "denom not found, setting state WHO");
+						//warningf("%s", "denom not found, setting state WHO");
 						state = ENTRY_WHO;
 						break;
 					case ENTRY_AMOUNT:
@@ -205,8 +206,7 @@ void ledger_parse_data(char *text, size_t text_len)
 				if (isdigit(c)) {
 					// try to parse a date
 					time_t tn = ledger_timestamp_from_ledger_date(text + i);
-					warningf("date str: %.*s\n", 10, text + i);
-					warningf("date: %ld\n", tn);
+					warningf("%.*s: %ld	", 10, text + i, tn);
 					// date is expected to have the form DD/MM/YYYY (10)
 					i += 10;
 					if (tn == (time_t) - 1) goto ledger_parse_error_handle;
@@ -226,23 +226,12 @@ void ledger_parse_data(char *text, size_t text_len)
 						comment_len++;
 					}
 					comment.len = comment_len;
-					warningf("Comment: %.*s\n", comment_len,
+					warningf("Comment: %.*s", comment_len,
 							comment);
-					state = ENTRY_WHO;
+					state = ENTRY_START;
 				}
 				break;
-			case ENTRY_SPACE:
-				{
-					size_t original_i = i;
-					while (i < text_len && isspace(text[i])) i++;
-					int wsc = i - original_i;
-					warningf("i: %ld, Spaces: %d\n", i, wsc);
-					if (wsc < 2) {
-						goto ledger_parse_error_handle;
-					}
-					state = ENTRY_WHO;
-				}
-				break;
+			case ENTRY_START:
 			case ENTRY_WHO:
 				{
 					// add this to register
@@ -268,9 +257,8 @@ void ledger_parse_data(char *text, size_t text_len)
 					}
 ledger_who_parsed:
 					who_len = i - who_len;
-					warningf("parsed: i=%d\n", i);
 					account_add(&rootp, who.str, who_len);
-					warningf("i=%d, Who: %.*s\n", i, who_len, who);
+					warningf("\n(%d) Who: %.*s", i, who_len, who);
 					state = ENTRY_SIGN_DENOM_AMOUNT;
 					// add to tags here
 				}
@@ -302,7 +290,7 @@ ledger_who_parsed:
 			 } break;
 			case ENTRY_DENOM: {
 				char _c;
-				warningf("denom-i: %d\n", i + 1);
+				warningf("  %d: D:", i + 1);
 				char *denom = text + i;
 				size_t denom_len = 0;
 				while (i < text_len &&
@@ -313,12 +301,12 @@ ledger_who_parsed:
 					state = hold_sign? ENTRY_AMOUNT: ENTRY_SIGN_AMOUNT;
 				else
 					state = ENTRY_END;
-				warningf("%d> len: %d, denom: %.*s\n", i, denom_len, denom_len, denom);
+				warningf(" %.*s(%d)", denom_len, denom, denom_len);
 				break;
 			}
 			case ENTRY_AMOUNT: {
 				char _c;
-				warningf("amount-i: %d\n", i + 1);
+				warningf("  %d A:", i + 1);
 				char *amount = text + i;
 				size_t amount_len = 0;
 				while (i < text_len  &&  (_c = *(text + i)) == '.' || isdigit(_c) || _c == ',') i++;
@@ -326,7 +314,7 @@ ledger_who_parsed:
 				// TODO convert amount to hold_amount integer
 				hold_amount = 0;
 				state = hold_denom_id == 0? ENTRY_DENOM : ENTRY_END;
-				warningf("%d> len: %d, amount: %.*s\n", i, amount_len, amount_len, amount);
+				warningf(" %.*s(%d)", amount_len, amount, amount_len);
 				}
 				break;
 			default:
@@ -339,19 +327,23 @@ ledger_parse_error_handle:
 	warningf("Parse failed at %ld b:(%d), Expected %s, got '%c'",
 			line_no, i, states_str[state], text[i]);
 }
-
-int main(int argc, char* argv[]) {
-	FILE* in = fopen("october-2023.txt", "r");
-	char* data = (char*)malloc(2048 * sizeof(char));
-	size_t data_size = 0;
-	size_t c_read =  0;
-	while((c_read = fread(data + data_size + 0, 1, BUFFER_SIZE, in)) != 0) {
-		data_size += c_read;
+Entry** ledger_read_file(const char* filename, time_t date_start, time_t date_end) {
+	Entity me = {"Account:Income"};
+	// list population, read from
+	FILE* file = fopen(filename, "r");
+	if (file == NULL) {
+		printf("Failed to open file %s\n", filename);
 	}
-	if (ferror(in)) fprintf(stderr, "Error reading file\n");
-	fprintf(stdout, "Startig loop\n");
-	ledger_parse_data(data, data_size);
-	return 0;
+	Entry** new_list = (Entry**)malloc(sizeof(Entry*) * 12);
+	for(int i = 0; i < 12; i++) {
+		Entry* entry = (Entry*)malloc(sizeof(Entry));
+		new_list[i] = entry;
+		entry->from = &me;
+		entry->to = (Entity*)malloc(sizeof(Entity));
+		entry->to->name = (char*)malloc(sizeof(char*) * 20);
+		strcpy(entry->to->name, "Man");
+	}
+	return new_list;
 }
 
 void *module_main(char *data, size_t data_len)

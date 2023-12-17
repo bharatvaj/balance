@@ -1,11 +1,10 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <dlfcn.h>
 #include <signal.h>
 #include <unistd.h>
 
-#include "common.h"
+#include <book.h>
 
 #define MAX_MEMORY 4064
 #define WINDOW_WIDTH 512
@@ -22,6 +21,22 @@ void sig_handle() {
 
 typedef void* (*module_main_func)(const char*, size_t);
 
+int main(int argc, char* argv[]) {
+	FILE* in = fopen("october-2023.txt", "r");
+	char* data = (char*)malloc(2048 * sizeof(char));
+	size_t data_size = 0;
+	size_t c_read =  0;
+	while((c_read = fread(data + data_size + 0, 1, BUFFER_SIZE, in)) != 0) {
+		data_size += c_read;
+	}
+	if (ferror(in)) fprintf(stderr, "Error reading file\n");
+	fprintf(stdout, "Startig loop\n");
+	ledger_parse_data(data, data_size);
+	return 0;
+}
+
+
+/*
 int main(int argc, char* argv[]) {
 	signal(SIGQUIT, sig_handle);
 	//while(1) {
@@ -54,3 +69,4 @@ int main(int argc, char* argv[]) {
 
 	return 0;
 }
+*/

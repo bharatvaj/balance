@@ -1,13 +1,14 @@
 GENERAL_FLAGS=-fPIC
 LDFLAGS:=$(GENERAL_FLAGS) -lglfw -lGL -lm
 CFLAGS:=$(GENERAL_FLAGS) -O0 -I. -g -Werror #-Wpedantic
+export LD_LIBRARY_PATH=.
 
-.DEFAULT_GOAL=book
+.DEFAULT_GOAL=payredu
 
 CC=gcc
 
-%: %.c account.h
-	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $<
+%: %.c libbook.so
+	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) libbook.so $<
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -15,16 +16,16 @@ CC=gcc
 bal:
 	ledger -f october-2023.txt bal
 
-lib%.so: %.o
-	$(CC) -shared -Wl,-soname,$@ -o $@ $<
-
 balance: balance.c ledger.h
 
 hot: hot.c libbalance.so
 
-libbook.so: book.c book.h
+libbook.a: book.c book.h account.c account.h
 
-hotbook: hotbook.c
+libbook.so: book.o  account.o
+	$(CC) -shared -Wl,-soname,$@ -o $@ $^
+
+payredu: payredu.c libbook.so
 
 refresh:
 	git ls-files | entr sh hot.sh
@@ -32,13 +33,7 @@ refresh:
 format:
 	indent -psl -pal --use-tabs -ts4 -br -brs -ce -cli0 book.c
 
-awk_query = $$(awk '/\/\* $1/{flag=1; next}/$1 \*\//{flag=0}flag' $2.c)
-test_cmd = if [ "$$($< $(call awk_query,TEST_INPUT,$<))" = "$(call awk_query,TEST_OUTPUT,$<)" ]; \
-			   then echo Passed; \
-			   else echo Failed; \
-		   fi
-
-#include tests/tests.mk
+include tests/tests.mk
 
 clean:
-	-rm *.so *.o hotbook libbook.so test/account_tree
+	-rm *.so *.o hotbook libbook.so $(TESTS)
