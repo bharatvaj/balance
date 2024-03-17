@@ -1,5 +1,6 @@
 GENERAL_FLAGS=-fPIC
-LDFLAGS:=$(GENERAL_FLAGS) -lglfw -lGL -lm
+GUI_LDFLAGS=-lglfw -lGL
+LDFLAGS:=$(GENERAL_FLAGS)  -lm
 CFLAGS:=$(GENERAL_FLAGS) -O0 -I. -g -Werror #-Wpedantic
 export LD_LIBRARY_PATH=.
 
@@ -7,25 +8,24 @@ export LD_LIBRARY_PATH=.
 
 CC=gcc
 
-%: %.c libbook.so
-	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) libbook.so $<
+payredu: payredu.c libbook.a
+	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $> -L. -lbook
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+.o: .c
+	$(CC) $(CFLAGS) -c $> -o $@
 
 bal:
-	ledger -f october-2023.txt bal
+	#ledger -f october-2023.txt bal
 
 balance: balance.c ledger.h
 
 hot: hot.c libbalance.so
 
-libbook.a: book.c book.h account.c account.h
+libbook.a: book.o account.o
+	ar cr $@ $>
 
 libbook.so: book.o  account.o
-	$(CC) -shared -Wl,-soname,$@ -o $@ $^
-
-payredu: payredu.c libbook.so
+	$(CC) -shared -Wl,-soname,$@ -o $@ $>
 
 refresh:
 	git ls-files | entr sh hot.sh

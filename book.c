@@ -9,6 +9,7 @@
 
 #include <unistd.h>
 
+#ifdef ENABLE_GUI
 #include <GLFW/glfw3.h>
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_IO
@@ -22,6 +23,7 @@
 #define NK_KEYSTATE_BASED_INPUT
 #include <nuklear.h>
 #include <nuklear_glfw_gl2.h>
+#endif
 
 #define _XOPEN_SOURCE
 #include <time.h>
