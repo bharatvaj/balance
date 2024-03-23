@@ -21,9 +21,9 @@ map_tree_t *account_search(map_tree_t *rootp, char *acc, size_t acc_size)
 
 	// search the string in it's children
 	for (size_t i = 0; i < rootp->children_len; i++) {
-		vstr_t *val = rootp->children[i].value;
+		vstr_t *val = rootp->children[i]->value;
 		if (val != NULL && acc_size == val->len && (strncmp(acc, val->str, acc_size) == 0)) {
-			return rootp->children + i;
+			return rootp->children[i];
 		}
 	}
 	return NULL;
@@ -33,12 +33,11 @@ int account_add(map_tree_t **rootp, char *acc, size_t acc_size)
 {
 	size_t records_needed = tree_depth * 4;
 	if (*rootp == NULL) {
-		*rootp = malloc(sizeof(map_tree_t));
-	}
-	if ((*rootp)->children == NULL) {
-		(*rootp)->children =
-			(map_tree_t *) calloc(records_needed, sizeof(map_tree_t));
-		(*rootp)->children_len = 0;
+		/* allocate the entire struct and it's children */
+		*rootp = calloc(1, sizeof(map_tree_t)       // the struct itself
+			+ sizeof(map_tree_t *) * records_needed // pointers to children
+			+ sizeof(map_tree_t) * records_needed); // children
+		(*rootp)->children = (map_tree_t**)(*rootp)->children;
 		(*rootp)->children_cap = records_needed;
 	}
 	map_tree_t* _rootp = *rootp;
@@ -48,10 +47,8 @@ int account_add(map_tree_t **rootp, char *acc, size_t acc_size)
 			size_t j = i + 1;
 			map_tree_t *current_node = account_search(_rootp, acc, j);
 			if (current_node == NULL) {
-				// return the previously allocated child
-				current_node = _rootp->children + _rootp->children_len++;
-				// current_node->value is NULL when the search fails
-				// we have to set the value now
+				/* search failed, we have to a new node and add it to the growing list */
+				current_node = _rootp->children[_rootp->children_len++];
 				// TODO maybe save vstrs in a pool and use them, would provide a sane way to free memory
 				vstr_t *vstr = (vstr_t *) malloc(sizeof(vstr_t));
 				vstr->str = acc;

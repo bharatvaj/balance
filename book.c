@@ -80,19 +80,19 @@ typedef struct {
 typedef struct {
 	vstr_t *reg;
 	LedgerValue val;
-} LedgerRecord;
+} LedgerPosting;
 
 typedef struct {
-	time_t date;		// the date associated with the entry
-	vstr_t comment;		// comment associated with the entry
-	LedgerRecord **records;
+	time_t date;
+	vstr_t comment;
+	LedgerPosting *postings;
 } LedgerEntry;
 
 time_t ledger_timestamp_from_ledger_date(char *date_str)
 {
-	// converts string 'YYYY-MM-DD' to unix timestamp
-	// date_str should be exactly 10 characters
-	// printf("%.*s\n", 4, date_str);
+	/* converts string 'YYYY-MM-DD' to unix timestamp
+	 * date_str should be exactly 10 characters
+	 * printf("%.*s\n", 4, date_str); */
 	struct tm tm = { 0 };
 	tm.tm_year = natoi(date_str, 4) - 1900;
 	tm.tm_mon = natoi(date_str + 5, 2) - 1;
@@ -145,12 +145,11 @@ void ledger_parse_data(char *text, size_t text_len)
 	size_t i = 0;
 	// TODO it may be possible to push these to the tree itself, explore the possibility
 	// these act as temporary register until we push back the entry to a tree
-	time_t hold_date;
-	vstr_t hold_comment = { 0 };
-	vstr_t hold_register = { 0 };
-	long int hold_amount = LONG_MAX;
-	short hold_sign = -1;
-	size_t hold_denom_id = { 0 };
+	LedgerEntry he; /* hold entry */
+	short hsign = -1;
+	he.postings = (LedgerPosting *) calloc(1, sizeof(LedgerPosting) * 2);
+	short entry_count = 0;
+
 	short n_count = 0;
 
 	while (i < text_len) {
@@ -164,9 +163,9 @@ void ledger_parse_data(char *text, size_t text_len)
 				switch (state) {
 					// after parsing the amount seq, we set the state to ENTRY_WHO
 					case ENTRY_WHO:
+					    he.postings[entry_count].val.amount	= LONG_MAX;
 					case ENTRY_END:
-						hold_sign = -1;
-						hold_amount = LONG_MAX;
+						entry_count++;
 						// if entry_count <= 1 throw error
 						if (text[i - 1] == '\n') {
 							state = DATE;
@@ -190,6 +189,8 @@ void ledger_parse_data(char *text, size_t text_len)
 						break;
 					case ENTRY_AMOUNT:
 						goto ledger_parse_error_handle;
+						break;
+					default:
 						break;
 				}
 				i++;
@@ -228,8 +229,8 @@ void ledger_parse_data(char *text, size_t text_len)
 						comment_len++;
 					}
 					comment.len = comment_len;
-					warningf("Comment: %.*s", comment_len,
-							comment);
+					warningf("Comment: %.*s", (int)comment_len,
+							comment.str);
 					state = ENTRY_START;
 				}
 				break;
@@ -260,7 +261,7 @@ void ledger_parse_data(char *text, size_t text_len)
 ledger_who_parsed:
 					who_len = i - who_len;
 					account_add(&rootp, who.str, who_len);
-					warningf("\n(%d) Who: %.*s", i, who_len, who);
+					warningf("\n\tl#%zu Who: %.*s ", i, (int)who_len, who.str);
 					state = ENTRY_SIGN_DENOM_AMOUNT;
 					// add to tags here
 				}
@@ -268,7 +269,7 @@ ledger_who_parsed:
 			case ENTRY_SIGN_DENOM_AMOUNT:
 				if (*(text + i) == '-' ) {
 					// TODO throw already set error
-					if (hold_sign >= 0) goto ledger_parse_error_handle;
+					if (hsign >= 0) goto ledger_parse_error_handle;
 					state = ENTRY_SIGN;
 				} else if (isdigit(*(text + i))) state = ENTRY_AMOUNT;
 				else state = ENTRY_DENOM;
@@ -276,7 +277,7 @@ ledger_who_parsed:
 			case ENTRY_SIGN_AMOUNT:
 				if (*(text + i) == '-' ) {
 					// TODO throw already set error
-					if (hold_sign >= 0) goto ledger_parse_error_handle;
+					if (hsign >= 0) goto ledger_parse_error_handle;
 					state = ENTRY_SIGN;
 				} else if (isdigit(*(text + i))) state = ENTRY_AMOUNT;
 				else goto ledger_parse_error_handle;
@@ -285,38 +286,36 @@ ledger_who_parsed:
 				if (*(text + i) == '-') {
 					   i++;
 					   // AMOUNT cannot be set before SIGN
-					   if (hold_amount != LONG_MAX) goto ledger_parse_error_handle;
-					   hold_sign = 1;
+					   if (he.postings[entry_count].val.amount != LONG_MAX) goto ledger_parse_error_handle;
+					   hsign = 1;
 					   state = ENTRY_SIGN_DENOM_AMOUNT;
 				}
 			 } break;
 			case ENTRY_DENOM: {
 				char _c;
-				warningf("  %d: D:", i + 1);
 				char *denom = text + i;
 				size_t denom_len = 0;
 				while (i < text_len &&
 						( isalpha(*(text + i))
 						 || *(text + i) == '$')) i++;
 				denom_len = (text + i) - denom;
-				if (hold_amount == LONG_MAX)
-					state = hold_sign? ENTRY_AMOUNT: ENTRY_SIGN_AMOUNT;
+				if (he.postings[entry_count].val.amount == LONG_MAX)
+					state = hsign? ENTRY_AMOUNT: ENTRY_SIGN_AMOUNT;
 				else
 					state = ENTRY_END;
-				warningf(" %.*s(%d)", denom_len, denom, denom_len);
+				warningf("D#%zu: %.*s ", denom_len, (int)denom_len, denom);
 				break;
 			}
 			case ENTRY_AMOUNT: {
 				char _c;
-				warningf("  %d A:", i + 1);
 				char *amount = text + i;
 				size_t amount_len = 0;
 				while (i < text_len  &&  (_c = *(text + i)) == '.' || isdigit(_c) || _c == ',') i++;
 				amount_len = (text + i) - amount;
-				// TODO convert amount to hold_amount integer
-				hold_amount = 0;
-				state = hold_denom_id == 0? ENTRY_DENOM : ENTRY_END;
-				warningf(" %.*s(%d)", amount_len, amount, amount_len);
+				// TODO convert amount to he.postings[entry_count].amount integer
+				he.postings[entry_count].val.amount = 0;
+				//state = hold_denom_id == 0? ENTRY_DENOM : ENTRY_END;
+				warningf("A#%zu: %.*s ", amount_len, (int)amount_len, amount);
 				}
 				break;
 			default:
@@ -326,8 +325,8 @@ ledger_who_parsed:
 	warning("read complete\n");
 	return;
 ledger_parse_error_handle:
-	warningf("Parse failed at %ld b:(%d), Expected %s, got '%c'",
-			line_no, i, states_str[state], text[i]);
+	warningf("\nParse failed at l#%ld 0x%zu, Expected a %s, got '%c'\n",
+			line_no, i + 1, states_str[state], text[i]);
 }
 Entry** ledger_read_file(const char* filename, time_t date_start, time_t date_end) {
 	Entity me = {"Account:Income"};
@@ -354,4 +353,5 @@ void *module_main(char *data, size_t data_len)
 	warning("\n=======| Startality |=======\n");
 	ledger_parse_data(data, data_len);
 	warning("\n========| Fatality |========\n");
+	return NULL;
 }

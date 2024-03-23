@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
 		data_size += c_read;
 	}
 	if (ferror(in)) fprintf(stderr, "Error reading file\n");
-	fprintf(stdout, "Startig loop\n");
+	// fprintf(stdout, "Startig loop\n");
 	ledger_parse_data(data, data_size);
 	return 0;
 }

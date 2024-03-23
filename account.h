@@ -12,7 +12,7 @@ struct map_tree {
 	vstr_t *value;
 	size_t children_cap;
 	size_t children_len;
-	struct map_tree* children;
+	struct map_tree** children;
 };
 
 typedef struct map_tree map_tree_t;
